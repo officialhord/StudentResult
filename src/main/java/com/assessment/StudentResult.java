@@ -5,11 +5,12 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.Json;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.asyncsql.PostgreSQLClient;
-import io.vertx.ext.sql.SQLClient;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.pgclient.PgConnectOptions;
+import io.vertx.pgclient.PgPool;
+import io.vertx.sqlclient.PoolOptions;
+import io.vertx.sqlclient.SqlConnection;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -200,10 +201,53 @@ public class StudentResult {
         server.requestHandler(router::accept).listen(9001);
 
         //Database handler
-        JsonObject postgreSQLClientConfig = new JsonObject().put("localhost", "school");
-        SQLClient postgreSQLClient = PostgreSQLClient.createShared(vertx, postgreSQLClientConfig);
+//        JsonObject postgreSQLClientConfig = new JsonObject().put("localhost", "school");
+//        SQLClient postgreSQLClient = PostgreSQLClient.createShared(vertx, postgreSQLClientConfig, "PostgreSQLPool1");
+//
+//        postgreSQLClient.getConnection(res -> {
+//            if (res.succeeded()) {
+//
+//                SQLConnection connection = res.result();
+//
+//                // Got a connection
+//
+//            } else {
+//                // Failed to get connection - deal with it
+//            }
+//        });
 
+        PgConnectOptions connectOptions = new PgConnectOptions()
+                .setPort(5432)
+                .setHost("the-host")
+                .setDatabase("the-db")
+                .setUser("user")
+                .setPassword("secret");
 
+// Pool options
+        PoolOptions poolOptions = new PoolOptions()
+                .setMaxSize(5);
+
+// Create the pooled client
+        PgPool client = PgPool.pool(vertx, connectOptions, poolOptions);
+
+// Get a connection from the pool
+        client.getConnection(ar1 -> {
+
+            if (ar1.succeeded()) {
+
+                System.out.println("Connected");
+
+                // Obtain our connection
+                SqlConnection conn = ar1.result();
+
+                // All operations execute on the same connection
+                conn
+                        .query("SELECT * FROM users WHERE id='postgres'")
+                        .execute();
+            } else {
+                System.out.println("Could not connect: " + ar1.cause().getMessage());
+            }
+        });
     }
 
     private static boolean checkRegistration(int studentId, int term) {
@@ -219,7 +263,6 @@ public class StudentResult {
 
         return terms.contains(term);
     }
-
 
     private static void initialize_data() {
 
