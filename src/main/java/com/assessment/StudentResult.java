@@ -1,9 +1,6 @@
 package com.assessment;
 
-import com.assessment.Data.schoolClass;
-import com.assessment.Data.schoolScores;
-import com.assessment.Data.schoolStudent;
-import com.assessment.Data.schoolSubject;
+import com.assessment.Data.*;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerResponse;
@@ -26,6 +23,8 @@ public class StudentResult {
     private static List<schoolClass> schoolClasses = new ArrayList<>(3);
     private static List<schoolSubject> schoolSubjects = new ArrayList<>();
 
+    private static List<Registrations> registrations = new ArrayList<>();
+
     private final static List<Integer> terms = Arrays.asList(1, 2, 3);
     private static List<schoolScores> allSchoolScores = new ArrayList<>();
 
@@ -38,17 +37,28 @@ public class StudentResult {
         Router router = Router.router(vertx);
 
         //Add student @POST Method
-        router.post("/addStudent")
+        router.post("/addStudent/:term")
                 .handler(BodyHandler.create())
                 .handler(routingContext -> {
                     final schoolStudent schoolStudent = Json.decodeValue(routingContext.getBody(), schoolStudent.class);
-                    HttpServerResponse serverResponse = routingContext.response();
-                    serverResponse.setChunked(true);
-                    schoolStudents.add(schoolStudent);
-                    serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
-                            + "Request response message: " + routingContext.response().getStatusMessage()
-                            + "\n" +
-                            "Added " + schoolStudents.size() + " student");
+                    int term = Integer.parseInt(routingContext.request().getParam("term"));
+
+                    if (validateTerm(term)) {
+                        HttpServerResponse serverResponse = routingContext.response();
+                        serverResponse.setChunked(true);
+                        schoolStudents.add(schoolStudent);
+                        registrations.add(new Registrations(schoolStudent.getStudentId(), schoolStudent.getStudentClass(), term));
+                        serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
+                                + "Request response message: " + routingContext.response().getStatusMessage()
+                                + "\n" +
+                                "New Student Registration created for " + term + "\n" + schoolStudent);
+                    } else {
+                        routingContext.response().setChunked(true)
+                                .end("Request response code: " + routingContext.response().getStatusCode() + "\n"
+                                        + "Request response message: " + routingContext.response().getStatusMessage()
+                                        + "\n" + "term requested does not Exist"
+                                );
+                    }
                 });
 
         //Add score for student @POST Method
@@ -60,11 +70,22 @@ public class StudentResult {
                     HttpServerResponse serverResponse = routingContext.response();
                     serverResponse.setChunked(true);
 
-                    allSchoolScores.add(studentScore);
-                    serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
-                            + "Request response message: " + routingContext.response().getStatusMessage()
-                            + "\n" +
-                            "Added " + Json.encodePrettily(studentScore));
+                    if (checkRegistration(studentScore.getStudentId(), studentScore.getTerm())) {
+                        allSchoolScores.add(studentScore);
+                        serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
+                                + "Request response message: " + routingContext.response().getStatusMessage()
+                                + "\n" +
+                                "Added " + Json.encodePrettily(studentScore));
+                    } else {
+                        serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
+                                + "Request response message: " + routingContext.response().getStatusMessage()
+                                + "\n" +
+                                "No term " + studentScore.getTerm()
+                                + " registration found for Student "
+                                + schoolStudents.stream().filter(t -> t.getStudentId() == studentScore.getStudentId()).findFirst().get().getStudentName());
+                    }
+
+
                 });
 
         //Return all students @Get Method
@@ -96,7 +117,17 @@ public class StudentResult {
                             schStudent = schoolStudents.stream().filter(n -> n.getStudentName().equals(name)).findFirst().get();
                             int studentId = schStudent.getStudentId();
 
-                            studentScores.removeIf(t -> t.getStudentId() != studentId);
+                            if (checkRegistration(studentId, term)) {
+                                studentScores.removeIf(t -> t.getStudentId() != studentId);
+
+                            } else {
+                                routingContext.response().setChunked(true)
+                                        .end("Request response code: " + routingContext.response().getStatusCode() + "\n"
+                                                + "Request response message: " + routingContext.response().getStatusMessage()
+                                                + "\n" + "Students not registered for term " + term
+                                        );
+                            }
+
                         } else {
                             routingContext.response().setChunked(true)
                                     .end("Request response code: " + routingContext.response().getStatusCode() + "\n"
@@ -160,9 +191,11 @@ public class StudentResult {
 
 
         /*
-        @TODO :::: add registration to know what student is registered for what class
+        @TODO :::: add registration to know what student is registered for what class :: COMPLETED
+        @TODO :::: verify if student is registered for term before returning result :: COMPLETED
         @TODO :::: verify registration before adding result
-        @TODO :::: add postgresql and switch lists to DB calls
+        @TODO :::: finish postgresql and switch lists to DB calls
+
          */
 
 
@@ -173,6 +206,11 @@ public class StudentResult {
         SQLClient postgreSQLClient = PostgreSQLClient.createShared(vertx, postgreSQLClientConfig);
 
 
+    }
+
+    private static boolean checkRegistration(int studentId, int term) {
+
+        return registrations.stream().filter(t -> t.getStudentID() == studentId && t.getTerm() == term).findFirst().isPresent();
     }
 
     private static boolean validateStudent(String name) {
