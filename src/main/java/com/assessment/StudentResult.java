@@ -190,15 +190,6 @@ public class StudentResult {
                 });
 
 
-        /*
-        @TODO :::: add registration to know what student is registered for what class :: COMPLETED
-        @TODO :::: verify if student is registered for term before returning result :: COMPLETED
-        @TODO :::: verify registration before adding result
-        @TODO :::: finish postgresql and switch lists to DB calls
-
-         */
-
-
         server.requestHandler(router::accept).listen(9001);
 
         //Database handler
