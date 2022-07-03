@@ -24,7 +24,6 @@ public class StudentResult {
     private static List<schoolSubject> schoolSubjects = new ArrayList<>();
 
     private static List<Registrations> registrations = new ArrayList<>();
-
     private final static List<Integer> terms = Arrays.asList(1, 2, 3);
     private static List<schoolScores> allSchoolScores = new ArrayList<>();
 
@@ -44,6 +43,8 @@ public class StudentResult {
                     int term = Integer.parseInt(routingContext.request().getParam("term"));
 
                     if (validateTerm(term)) {
+
+
                         HttpServerResponse serverResponse = routingContext.response();
                         serverResponse.setChunked(true);
                         schoolStudents.add(schoolStudent);
@@ -71,6 +72,12 @@ public class StudentResult {
                     serverResponse.setChunked(true);
 
                     if (checkRegistration(studentScore.getStudentId(), studentScore.getTerm())) {
+                        if (studentScore.getScore() > 100 || studentScore.getScore() < 0) {
+                            serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
+                                    + "Request response message: " + routingContext.response().getStatusMessage()
+                                    + "\n" +
+                                    "Invalid score " + studentScore.getScore());
+                        }
                         allSchoolScores.add(studentScore);
                         serverResponse.end("Request response code: " + routingContext.response().getStatusCode() + "\n"
                                 + "Request response message: " + routingContext.response().getStatusMessage()
